@@ -2,7 +2,7 @@ mod memoparser;
 mod memo;
 mod ethutils;
 
-use std::io::Result;
+//use std::io::Result;
 use tokio;
 use clap::Parser;
 pub use memo::TxType;
@@ -31,7 +31,7 @@ async fn main() -> web3::Result<()> {
     if unprefixed.len() == 64 {
         // It's probably a transaction hash => fetch calldata
         let calldata = ethutils::get_calldata(unprefixed, ETHEREUM_RPC.to_string()).await.unwrap();
-        println!("Fetched calldata: {} bytes", calldata.len() / 2);
+        println!("\nFetched calldata: {} bytes", calldata.len() / 2);
         memoparser::parse_calldata(calldata, ETHEREUM_RPC.to_string());
     } else {
         memoparser::parse_calldata(unprefixed, ETHEREUM_RPC.to_string());

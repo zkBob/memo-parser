@@ -44,7 +44,7 @@ pub struct Memo {
     pub items_num: u32,
     pub acc_hash: Vec<u8>,
     pub notes_hashes: Vec<Vec<u8>>, // 32 x (items_num - 1) bytes
-    pub A_p: Vec<u8>,               // 32 bytes
+    pub a_p: Vec<u8>,               // 32 bytes
     pub keys_enc: Vec<u8>,          // 32 * items_num + 16
     pub acc_enc: Vec<u8>,           // 86 bytes
     pub notes_enc: Vec<Vec<u8>>,    // 108 x (items_num - 1) bytes
@@ -76,7 +76,7 @@ impl Memo {
             offset += 32;
         }
 
-        let A_p = block[offset..offset+32].to_vec();
+        let a_p = block[offset..offset+32].to_vec();
         offset += 32;
 
         let keys_enc_raw = block[offset..offset+(items_num as usize)*32+16].to_vec();
@@ -99,7 +99,7 @@ impl Memo {
             items_num: items_num,
             acc_hash: acc_hash_raw,
             notes_hashes: notes_hashes_raw,
-            A_p: A_p,
+            a_p: a_p,
             keys_enc: keys_enc_raw,
             acc_enc: acc_enc_raw,
             notes_enc: notes_enc_raw,

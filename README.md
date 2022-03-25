@@ -1,7 +1,6 @@
 # memo-parser
--
 
-A small tool to parse zkBob Pool transaction's calldata
+A small tool to parse zkBob Pool transaction's calldata. The calldata should be started with 'af989083' which is a `transact` method selector
 
 ## Using
 
@@ -11,9 +10,12 @@ cd memo-parser/
 cargo run <calldata_or_tx_hash>
 ```
 
-You can provide a transaction hash or the calldata directly. All input is just a hex strings (prefix 0x is optional).
+To change network you can edit the constant `ETHEREUM_RPC` in the `main.rs` to set the appropriate JSON RPC node
+
 
 ## Example
+
+You can provide a transaction hash or the calldata directly. All input is just a hex strings without any spaces (prefix 0x is optional)
 
 ```
 cargo run 0xee3f83154d2837e348be3789c550eaffc6dfbc272720c579db523233097473f2
@@ -24,52 +26,53 @@ cargo run 0xaf9890832711712d54721af2e6acb4ebe63681baa29da74a6bf1b79419e949ed88cc
 ## Output
 
 ```
-Fetched calldata: 919 bytes
+$ $ cargo run 0xe18505b332c5942176e9288c1b0043afd64c58cbf8e64edf31365e5dc35327a8
+    Finished dev [unoptimized + debuginfo] target(s) in 0.48s
+     Running `target/debug/memo-parser 0xe18505b332c5942176e9288c1b0043afd64c58cbf8e64edf31365e5dc35327a8`
+
+Fetched calldata: 918 bytes
 Selector       : 0xaf989083
-Nullifier      : 0x1a0fe6f449922ed4173f73c77c7fff97cea27dbeb81188ec72ebec3c6ddc0f37
-Commitnment    : 0x0a3f732edcf1584a9b83d2baf55ed5a7613b7f4d2101bdcf5ce2c34d57008d65
-Index          : 30208 (0x7600)
-Energy delta   : 0 (0x0)
-Token delta    : 3,000,000,000 (0xb2d05e00)
-Tx proof       : 1fd8a58c1b5c949ac17cd3d316e4d6267aac0d3889bca318344e85c1065aad3f
-                 1ab34677b1228385b241859d102163a0ab3fd17c959481905d46608e192e46cb
-                 1192a04a311add9ab1dc456a0d82a27a99fee79158bb2e266c327596e99488c9
-                 2cc1f53854916eec56cf8f8d89977aaf0bc0a8e1f19ba1017c65c56ca02432dc
-                 1bbd0ed8edc9563688b1ed6bacd4a3005e2a2cfee5316c78d7161395dba7daeb
-                 11188ce1e5dc056086a74d895e108af85206618eb23b88596bdf295ef05bb674
-                 164f2d7e92d0cd1cc2393257424d914c65472fa83b7230f98028575c897b615d
-                 16cfc8da751c5d8aa92352e7a2e13dfbe7b79c9391ba4d36db2bbf6d9d702afa
+Nullifier      : 0x0b1e48e793b78b8a0e42dc588e678114a5a35b20ad0f54804c911b65f728a2b3
+Commitnment    : 0x125cea68695d94789930911523b70217d6da29d5f8c138b0e0a3e1659de13640
+Index          : 31104 (0x7980)
+Energy delta   : 0 Gwei (0x0)
+Token delta    : 2,000,000,000 Gwei (0x77359400)
+Tx proof       : 2d050b6d7184f2aebea328972a8a29289c39f2f5048546e2d1592aa0e56ed168
+                 2eef33b76dea51ed51d2fafa42600e82894f03edf41d15964ac40758ebd7b25a
+                 20605cad3f227027f0348bd41efe63ad6c3e2da0b7d295c8bbcd2ca3b7bd94fd
+                 1b85ffbbb725a405852b9d19331d085e7c81c0f2d33141fa780f35d6fc1a7fe4
+                 259bdada3b6623b1eca123af93e5bf98569b41a3d0c5f1485ee811332b40d01b
+                 287b99ba6c31f98cd6b5a75443b2a76c7f05f84a702f437dfd7bbe6afd4c74fe
+                 1a7b3083af489e69ca0407a911eec0993d312b800809ff3cd0183bcdd97fa554
+                 2e11ef304c0677bd14bfd10b0151da63d0b61a1ddcec31913163969d8460f18b
 
-Tree proof     : 03a7bce20c08104125349866aa894b7ae11acdf5a8c8913d66663b4cafffdf60
-                 2782b62554da604e5715069abfa6b023fb5409dbfdbc9613d388b3aba6899e6f
-                 254f1539a1d815bb6c79b59bfcc7155fc47c3c6b955990bc82a835373d2ed77d
-                 116e7f4b6c1564a3e2d73eac8ccb767efa349a48167a26915ba957c4ced0dabc
-                 2cc1ca6c03b926a9a197c5debd43415d9fd0b6ea041657e6721d2cd472b7244d
-                 19c70096444151809bc3432cfd0ca1131525f5c6bd8bc2af6564eda22abc01da
-                 0d4a7b824ef32d03e981cb5365c3f90675d273aef751d13cb70a67ce251d4d2c
-                 11467533892f0c951ad48013281560a2e764139d84fb370b88a2d60427bcac98
+Tree proof     : 0eead7cef2dd6ee9af74dbf2b84b451261526bfdd7267aeaf72940b5fc94d692
+                 092405e7a32c7b92960efce485269026b1099d478656ff4f38ca4c00d2bff5ee
+                 26a808815f0eeb6839bd0d79d872cdaa8d7b74debdebe86ce2be8abe0cde27e4
+                 202116d7b36ee173fff9d54048650ea8d15e24a0adda0cd7cdde2b065d27eae4
+                 133777c0c37585ac71ce25c9ea4d56f66150f04acb92823ba84e0e697d9abd0f
+                 050770a07e06899c7938c92c0ce5431968f582aec10fbba034ba030e38dddb5c
+                 1db3035c6e6997527e728268889dabaf51e320110a3d340d4cbb7fc6663ee659
+                 14336d040dfc668489ef72bb5296045fd0b0bd9d6c511356c910841a9777f24c
 
-New Merkle Root: 015c913d6f602f0c161a239642bdd34d759adf71551abc76e335ae0706c65863
+New Merkle Root: 29d0eb4674bad45b3cab15556750cdb7263ee4ef772c78ba378b32584f25bf02
 Tx type        : Deposit (0)
 Memo size      : 210 bytes
---------------- MEMO BLOCK ---------------
+----------------------------------- MEMO BLOCK -----------------------------------
 Tx fee         : 0 (0x0)
 Items number   : 1
-Account hash   : 4c39bb90fdc7fdc3f6355a828f7a8e684c0ffb1d0e92d3363a8b3a610eb5a32e
-A_p            : 86e46e5dbf49b0cfd960042f77493a73628f998cdcbe7b9d1eecefb8e6090c06
-Encrypted keys : cb20ca3d203666652938a7533155fd52ee7882e255e6b12cee25355af14bdd92
-                 956cfc93cbca314e81582c45512b6199
+Account hash   : 798580acf077a9fa84cc72e8df4f8fd3b74a363d80435a04ac4ee229b45fc00c
+A_p            : aaefd96e2ffdd2922086e3f5487a10f86992677c988058544ca67051d2876015
+Encrypted keys : 24534fc93382b5d32e288b3d780f67139cce6d1fcac7d75f1357057f3f491cae
+                 4204d01efad840b1d336fa80b5ddf06f
 
-Encrypted acc  : c5182b40eb7c1c256aa7ce40be3432328476f08143428aaf03662b9772882557
-                 3231e75b72f47cefd983a7f5c320e68c845e482c4b61ace16069b0dfa386611a
-                 b6a6d39b4a22ec9e7a59e4f40d67b2e959aba28a1028
-
-------------------------------------------
-ECDSA signature: 5dab9ccb5c7aa6c4359f36f6d5f3447783b2591a1f4910730dc3166032445ded
-                 7949702f9627195283348387f6b01efe586941b6160fd9cb85bd45acd400c332
-                 1b
-
-Deposit spender: 0xdc31113dd4011101abc126c7e339717cd0af91eb (recovered from ECDSA)
+Encrypted acc  : 5ddc81a0812cdd3233290339a082081adc68b19296841813a8f8d3b7d8a5cf7d
+                 f3a9791385040165d48e22d6102377b0c7f391b8b45fa705c1b1474e32c3f8cd
+                 9759fd858836635d1a3901640fdec357189a1552d529
+----------------------------------------------------------------------------------
+ECDSA signature: fee3d380f303ed3d7fb17edd6a1682fbe2881e086c7cf524926adf0648f52254
+                 e92c237927fc3052d2ebc9f7d2a7797db1cbbe09d35b22af322723cf25d5e222
+Deposit spender: 0x6d16337b9a1651556749230eeaa4dc602a22dcaf (recovered from ECDSA)
 
 Transaction has been processed successfully!
 ```
