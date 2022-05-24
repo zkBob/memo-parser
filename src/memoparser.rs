@@ -2,6 +2,7 @@ use crate::memo::Memo;
 use crate::memo::TxType;
 use crate::ethutils::ecrecover;
 use thousands::Separable;
+use chrono::{DateTime, TimeZone, NaiveDateTime, Utc};
 extern crate hex;
 
 //use memo::{TxType, Memo};
@@ -93,7 +94,8 @@ pub fn parse_calldata(data: String, rpc: String) {
         return;
     }
 
-    if (tx_type != TxType::Withdrawal && memo_size < 210) || (tx_type == TxType::Withdrawal && memo_size < 238) {
+    let isExtraFields: bool = tx_type == TxType::Withdrawal || tx_type == TxType::DepositPermittable;
+    if (!isExtraFields && memo_size < 210) || (isExtraFields && memo_size < 238) {
         println!("Incorrect memo block length");
         return;
     }
@@ -105,6 +107,11 @@ pub fn parse_calldata(data: String, rpc: String) {
     if tx_type == TxType::Withdrawal {
         println!("Native amount  : {} Gwei (0x{:x})", memo.amount.separate_with_commas(), memo.amount);
         println!("Withdraw addr  : 0x{}", memo.receiver);
+    }
+    if tx_type == TxType::DepositPermittable {
+        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(memo.deadline as i64, 0), Utc);
+        println!("Deadline       : {} (0x{:x})", dt.format("%Y-%m-%d %H:%M:%S"), memo.deadline);
+        println!("Holder addr    : 0x{}", memo.holder);
     }
     println!("Account hash   : {}", hex::encode(memo.acc_hash));
     for (note_idx, note_hash) in memo.notes_hashes.iter().enumerate() {
@@ -134,14 +141,22 @@ pub fn parse_calldata(data: String, rpc: String) {
         let ecdsa_sign = bytes[cur_offset..cur_offset+64].to_vec();
         cur_offset += 64;
 
-        /*if rem_len > 64 {
-            ecdsa_sign.push(bytes[cur_offset]);
-            cur_offset = cur_offset + 1;
-        }*/
-
         print_long_hex("ECDSA signature: ".to_string(), hex::encode(ecdsa_sign.to_vec()), 64);
         let addr = ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc);
         println!("Deposit spender: 0x{} (recovered from ECDSA)", addr);
+    } else if tx_type == TxType::DepositPermittable {
+        let rem_len = bytes.len() - cur_offset;
+        if rem_len < 64 {
+            println!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset);
+            return;
+        };
+
+        let ecdsa_sign = bytes[cur_offset..cur_offset+64].to_vec();
+        cur_offset += 64;
+
+        print_long_hex("ECDSA signature: ".to_string(), hex::encode(ecdsa_sign.to_vec()), 64);
+        //let addr = ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc);
+        //println!("Deposit spender: 0x{} (recovered from ECDSA)", addr);
     }
 
     if cur_offset == bytes.len() {

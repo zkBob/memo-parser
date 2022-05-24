@@ -1,6 +1,6 @@
 [package]
 name = "memo-parser"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,3 +11,4 @@ hex = "0.4.3"
 thousands = "0.2.0"
 web3 = "0.18.0"
 tokio = "1.17.0"
+chrono = "0.4.0"

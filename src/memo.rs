@@ -6,6 +6,7 @@ pub enum TxType {
     Deposit = 0,
     Transfer = 1,
     Withdrawal = 2,
+    DepositPermittable = 3,
 }
 
 impl TxType {
@@ -14,6 +15,7 @@ impl TxType {
             0 => TxType::Deposit,
             1 => TxType::Transfer,
             2 => TxType::Withdrawal,
+            3 => TxType::DepositPermittable,
             _ => panic!("Unknown tx type ({})", value),
         }
     }
@@ -23,6 +25,7 @@ impl TxType {
             TxType::Deposit => 0,
             TxType::Transfer => 1,
             TxType::Withdrawal => 2,
+            TxType::DepositPermittable => 3,
         }
     }
 }
@@ -33,14 +36,17 @@ impl fmt::Display for TxType {
             TxType::Deposit => write!(f, "Deposit"),
             TxType::Transfer => write!(f, "Transfer"),
             TxType::Withdrawal => write!(f, "Withdrawal"),
+            TxType::DepositPermittable => write!(f, "DepositPermittable"),
         }
     }
 }
 
 pub struct Memo {
     pub fee: u64,
-    pub amount: u64,
-    pub receiver: String,
+    pub amount: u64,        // withdrawal only field
+    pub receiver: String,   // withdrawal only field
+    pub deadline: u64,      // permittable deposit only field
+    pub holder: String,     // permittable deposit only field
     pub items_num: u32,
     pub acc_hash: Vec<u8>,
     pub notes_hashes: Vec<Vec<u8>>, // 32 x (items_num - 1) bytes
@@ -57,9 +63,15 @@ impl Memo {
 
         let mut amount_raw: Vec<u8> = Vec::new();
         let mut receiver_raw: Vec<u8> = Vec::new();
+        let mut deadline_raw: Vec<u8> = Vec::new();
+        let mut holder_raw: Vec<u8> = Vec::new();
         if txtype == TxType::Withdrawal {
             amount_raw = block[offset..offset+8].to_vec();
             receiver_raw = block[offset+8..offset+8+20].to_vec();
+            offset += 28;
+        } else if txtype == TxType::DepositPermittable {
+            deadline_raw = block[offset..offset+8].to_vec();
+            holder_raw = block[offset+8..offset+8+20].to_vec();
             offset += 28;
         }
 
@@ -96,6 +108,8 @@ impl Memo {
             fee: u64::from_str_radix(&hex::encode(fee_raw), 16).unwrap(),
             amount: u64::from_str_radix(&hex::encode(amount_raw), 16).unwrap_or(0),
             receiver: hex::encode(receiver_raw),
+            deadline: u64::from_str_radix(&hex::encode(deadline_raw), 16).unwrap_or(0),
+            holder: hex::encode(holder_raw),
             items_num: items_num,
             acc_hash: acc_hash_raw,
             notes_hashes: notes_hashes_raw,
