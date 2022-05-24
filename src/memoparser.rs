@@ -2,7 +2,7 @@ use crate::memo::Memo;
 use crate::memo::TxType;
 use crate::ethutils::ecrecover;
 use thousands::Separable;
-use chrono::{DateTime, TimeZone, NaiveDateTime, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 extern crate hex;
 
 //use memo::{TxType, Memo};
@@ -94,8 +94,8 @@ pub fn parse_calldata(data: String, rpc: String) {
         return;
     }
 
-    let isExtraFields: bool = tx_type == TxType::Withdrawal || tx_type == TxType::DepositPermittable;
-    if (!isExtraFields && memo_size < 210) || (isExtraFields && memo_size < 238) {
+    let is_extra_fields: bool = tx_type == TxType::Withdrawal || tx_type == TxType::DepositPermittable;
+    if (!is_extra_fields && memo_size < 210) || (is_extra_fields && memo_size < 238) {
         println!("Incorrect memo block length");
         return;
     }
@@ -109,8 +109,9 @@ pub fn parse_calldata(data: String, rpc: String) {
         println!("Withdraw addr  : 0x{}", memo.receiver);
     }
     if tx_type == TxType::DepositPermittable {
-        let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(memo.deadline as i64, 0), Utc);
-        println!("Deadline       : {} (0x{:x})", dt.format("%Y-%m-%d %H:%M:%S"), memo.deadline);
+        let dt_utc = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(memo.deadline as i64, 0), Utc);
+        let dt_local: DateTime<Local> = DateTime::from(dt_utc);
+        println!("Deadline       : {} (0x{:x})", dt_local.format("%Y-%m-%d %H:%M:%S"), memo.deadline);
         println!("Holder addr    : 0x{}", memo.holder);
     }
     println!("Account hash   : {}", hex::encode(memo.acc_hash));
