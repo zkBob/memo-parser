@@ -27,8 +27,28 @@ fn print_long_hex(title: String, str: String, width: usize) {
     }
 }
 
+pub struct Calldata {
+    pub selector: Vec<u8>,
+    pub nullifier: Vec<u8>,
+    pub out_commit: Vec<u8>,
+    pub tx_index: u64,
+    pub energy_amount: i128,
+    pub token_amount: i128,
+    pub tx_proof: Vec<u8>,
+    pub root_after: Vec<u8>,
+    pub tree_proof: Vec<u8>,
+    pub tx_type: u32,
+    pub memo_size: u32,
+    pub memo: Memo,
+    pub ecdsa_sign: Vec<u8>,
+}
+
+pub enum ParsedCalldataError {
+    InternalError,
+}
+
 // data is a hex-string, without any 0x prefixes
-pub fn parse_calldata(data: String, rpc: String) {
+pub fn parse_calldata(data: String, rpc: String) -> Result<Calldata, ParsedCalldataError> {
     let res = hex::decode(data);
     let bytes = match res {
         Ok(vec) => vec,
@@ -38,12 +58,12 @@ pub fn parse_calldata(data: String, rpc: String) {
     let selector = &bytes[0..4];
     if hex::encode(selector) != "af989083" {
         println!("Incorrect method selector (0x{}). Probably it isn't a zkBob transaction!", hex::encode(selector));
-        return;
+        return Err(ParsedCalldataError::InternalError);
     }
 
     if bytes.len() < 644 {
         println!("Incorrect calldata length! It must be at least 644 bytes");
-        return;
+        return Err(ParsedCalldataError::InternalError);
     }
 
     let nullifier = &bytes[4..36];
@@ -91,16 +111,17 @@ pub fn parse_calldata(data: String, rpc: String) {
 
     if bytes.len() < 644 + memo_size as usize {
         println!("Incorrect calldata length! Memo block corrupted");
-        return;
+        return Err(ParsedCalldataError::InternalError);
     }
 
     let is_extra_fields: bool = tx_type == TxType::Withdrawal || tx_type == TxType::DepositPermittable;
     if (!is_extra_fields && memo_size < 210) || (is_extra_fields && memo_size < 238) {
         println!("Incorrect memo block length");
-        return;
+        return Err(ParsedCalldataError::InternalError);
     }
 
     let memo = Memo::parse_memoblock(Vec::from(&bytes[644..(644+memo_size) as usize]), tx_type);
+    let memo_clone = memo.clone();
     println!("----------------------------------- MEMO BLOCK -----------------------------------");
     println!("Tx fee         : {} (0x{:x})", memo.fee.separate_with_commas(), memo.fee);
     println!("Items number   : {}", memo.items_num);
@@ -131,12 +152,13 @@ pub fn parse_calldata(data: String, rpc: String) {
 
     println!("----------------------------------------------------------------------------------");
 
+    let mut ecdsa_sign: Vec<u8> = Vec::new();
     let mut cur_offset = 644 + memo_size as usize;
     if tx_type == TxType::Deposit {
         let rem_len = bytes.len() - cur_offset;
         if rem_len < 64 {
             println!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset);
-            return;
+            return Err(ParsedCalldataError::InternalError);
         };
 
         let ecdsa_sign = bytes[cur_offset..cur_offset+64].to_vec();
@@ -149,7 +171,7 @@ pub fn parse_calldata(data: String, rpc: String) {
         let rem_len = bytes.len() - cur_offset;
         if rem_len < 64 {
             println!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset);
-            return;
+            return Err(ParsedCalldataError::InternalError);
         };
 
         let ecdsa_sign = bytes[cur_offset..cur_offset+64].to_vec();
@@ -165,4 +187,21 @@ pub fn parse_calldata(data: String, rpc: String) {
     } else {
         println!("\n!!! There are extra byte(s) ({}) at the end of the calldata!\n", bytes.len() - cur_offset);
     }
+    Ok(
+        Calldata {
+            selector: selector.to_vec(),
+            nullifier: nullifier.to_vec(),
+            out_commit: commit.to_vec(),
+            tx_index: index,
+            energy_amount: delta_energy,
+            token_amount: delta_token,
+            tx_proof: tx_proof.to_vec(),
+            root_after: root_after.to_vec(),
+            tree_proof: tree_proof.to_vec(),
+            tx_type: tx_type.to_u32(),
+            memo_size: memo_size,
+            memo: memo_clone,
+            ecdsa_sign: ecdsa_sign,
+        }
+    )
 }
