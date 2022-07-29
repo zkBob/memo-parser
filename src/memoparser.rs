@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ethutils::ecrecover;
 use crate::memo::Memo;
 use crate::memo::TxType;
@@ -7,25 +9,27 @@ extern crate hex;
 
 //use memo::{TxType, Memo};
 
-fn print_long_hex(title: String, str: String, width: usize) {
+fn print_long_hex(title: String, str: String, width: usize) -> String {
     use std::str;
+    let mut result = String::new();
     let subs = str
         .as_bytes()
         .chunks(width)
         .map(str::from_utf8)
         .collect::<Result<Vec<&str>, _>>()
         .unwrap();
-    print!("{}", title);
+    result += &format!("{}", title);
     for (idx, substr) in subs.iter().enumerate() {
         if idx > 0 {
-            print!("{: <1$}", "", title.len());
+            result += &format!("{: <1$}", "", title.len());
         }
-        println!("{}", substr);
+        result += &format!("{}\n", substr);
     }
 
     if subs.len() == 0 {
-        println!();
+        result += &format!("\n");
     }
+    result
 }
 
 pub struct Calldata {
@@ -42,6 +46,61 @@ pub struct Calldata {
     pub memo_size: u32,
     pub memo: Memo,
     pub ecdsa_sign: Vec<u8>,
+    pub addr: Option<String>,
+}
+
+impl Display for Calldata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut result = String::new();
+        result += &format!("Selector       : 0x{}\n", hex::encode(&self.selector));
+        result += &format!("Nullifier      : 0x{}\n", hex::encode(&self.nullifier));
+        result += &format!("Commitnment    : 0x{}\n", hex::encode(&self.out_commit));
+        result += &format!("Index          : {} (0x{:x})\n", &self.tx_index, &self.tx_index);
+        result += &format!("Energy delta   : {} Gwei (0x{:x})\n", &self.energy_amount.separate_with_commas(), &self.energy_amount & 0xffffffffffffffffffffffffffff);
+        result += &format!("Token delta    : {} Gwei (0x{:x})\n", &self.token_amount.separate_with_commas(), &self.token_amount);
+        result += &print_long_hex("Tx proof       : ".to_string(), hex::encode(&self.tx_proof), 64);
+        result += &format!("\n");
+        result += &print_long_hex("Tree proof     : ".to_string(), hex::encode(&self.tree_proof), 64);
+        result += &format!("\n");
+        result += &format!("New Merkle Root: {}\n", hex::encode(&self.root_after));
+        result += &format!("Tx type        : {} ({})\n", &self.tx_type.to_string(), &self.tx_type);
+        result += &format!("Memo size      : {} bytes\n", &self.memo_size);
+        result += &format!("----------------------------------- MEMO BLOCK -----------------------------------\n");
+        result += &format!("Tx fee         : {} (0x{:x})\n", &self.memo.fee.separate_with_commas(), &self.memo.fee);
+        result += &format!("Items number   : {}\n", &self.memo.items_num);
+        if TxType::from_u32(self.tx_type) == TxType::Withdrawal {
+            result += &format!("Native amount  : {} Gwei (0x{:x})\n", &self.memo.amount.separate_with_commas(), &self.memo.amount);
+            result += &format!("Withdraw addr  : 0x{}\n", &self.memo.receiver);
+        }
+        if TxType::from_u32(self.tx_type) == TxType::DepositPermittable {
+            let dt_utc = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.memo.deadline as i64, 0), Utc);
+            let dt_local: DateTime<Local> = DateTime::from(dt_utc);
+            result += &format!("Deadline       : {} (0x{:x})\n", dt_local.format("%Y-%m-%d %H:%M:%S"), &self.memo.deadline);
+            result += &format!("Holder addr    : 0x{}\n", &self.memo.holder);
+        }
+        result += &format!("Account hash   : {}\n", hex::encode(&self.memo.acc_hash));
+        for (note_idx, note_hash) in self.memo.notes_hashes.iter().enumerate() {
+            result += &format!("Note #{} hash   : {}\n", note_idx, hex::encode(note_hash));
+        }
+        result += &format!("A_p            : {}\n", hex::encode(&self.memo.a_p));
+        result += &print_long_hex("Encrypted keys : ".to_string(), hex::encode(&self.memo.keys_enc), 64);
+        result += &print_long_hex("Encrypted acc  : ".to_string(), hex::encode(&self.memo.acc_enc), 64);
+
+        for (note_idx, enc_note) in self.memo.notes_enc.iter().enumerate() {
+            //println!("Encrypt note #{}: {}", note_idx, hex::encode(enc_note));
+            result += &print_long_hex(format!("Encrypt note #{}: ", note_idx), hex::encode(enc_note), 64);
+        };
+        result += &format!("----------------------------------------------------------------------------------\n");
+        if !self.ecdsa_sign.is_empty() {
+            result += &print_long_hex("ECDSA signature: ".to_string(), hex::encode(&self.ecdsa_sign.to_vec()), 64);
+        }
+        if self.addr.is_some() {
+            let addr = self.addr.as_ref().unwrap();
+            result += &format!("Deposit spender: 0x{} (recovered from ECDSA)", addr);
+        }
+
+        write!(f, "{}", result)
+    }
 }
 
 #[derive(Debug)]
@@ -56,11 +115,16 @@ pub fn parse_calldata(
 ) -> Result<Calldata, ParsedCalldataError> {
     let selector = &bytes[0..4];
     if hex::encode(selector) != "af989083" {
-        return Err(ParsedCalldataError::InternalError(format!("Incorrect method selector (0x{}). Probably it isn't a zkBob transaction!", hex::encode(selector))));
+        return Err(ParsedCalldataError::InternalError(format!(
+            "Incorrect method selector (0x{}). Probably it isn't a zkBob transaction!",
+            hex::encode(selector)
+        )));
     }
 
     if bytes.len() < 644 {
-        return Err(ParsedCalldataError::InternalError(format!("Incorrect calldata length! It must be at least 644 bytes")));
+        return Err(ParsedCalldataError::InternalError(format!(
+            "Incorrect calldata length! It must be at least 644 bytes"
+        )));
     }
 
     let nullifier = &bytes[4..36];
@@ -91,20 +155,25 @@ pub fn parse_calldata(
     let memo_size = u32::from_str_radix(&hex::encode(memo_size_raw), 16).unwrap();
 
     if bytes.len() < 644 + memo_size as usize {
-        return Err(ParsedCalldataError::InternalError(format!("Incorrect calldata length! Memo block corrupted")));
+        return Err(ParsedCalldataError::InternalError(format!(
+            "Incorrect calldata length! Memo block corrupted"
+        )));
     }
 
     let is_extra_fields: bool =
         tx_type == TxType::Withdrawal || tx_type == TxType::DepositPermittable;
     if (!is_extra_fields && memo_size < 210) || (is_extra_fields && memo_size < 238) {
-        return Err(ParsedCalldataError::InternalError(format!("Incorrect memo block length")));
+        return Err(ParsedCalldataError::InternalError(format!(
+            "Incorrect memo block length"
+        )));
     }
 
     let memo = Memo::parse_memoblock(Vec::from(&bytes[644..(644 + memo_size) as usize]), tx_type);
     let memo_clone = memo.clone();
 
     let mut ecdsa_sign: Vec<u8> = Vec::new();
-    let mut cur_offset = 644 + memo_size as usize;
+    let cur_offset = 644 + memo_size as usize;
+    let mut addr = None;
     if tx_type == TxType::Deposit {
         let rem_len = bytes.len() - cur_offset;
         if rem_len < 64 {
@@ -112,10 +181,10 @@ pub fn parse_calldata(
         };
 
         ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
-        cur_offset += 64;
+        // cur_offset += 64;
 
         if rpc.is_some() {
-            let addr = ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc.unwrap());
+            addr = Some(ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc.unwrap()));
         }
     } else if tx_type == TxType::DepositPermittable {
         let rem_len = bytes.len() - cur_offset;
@@ -124,8 +193,7 @@ pub fn parse_calldata(
         };
 
         ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
-        cur_offset += 64;
-
+        // cur_offset += 64;
     }
 
     Ok(Calldata {
@@ -142,6 +210,7 @@ pub fn parse_calldata(
         memo_size: memo_size,
         memo: memo_clone,
         ecdsa_sign: ecdsa_sign,
+        addr: addr,
     })
 }
 
