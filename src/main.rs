@@ -32,9 +32,9 @@ async fn main() -> web3::Result<()> {
         // It's probably a transaction hash => fetch calldata
         let calldata = ethutils::get_calldata(unprefixed, ETHEREUM_RPC.to_string()).await.unwrap();
         println!("\nFetched calldata: {} bytes", calldata.len() / 2);
-        memoparser::parse_calldata(calldata, ETHEREUM_RPC.to_string());
+        memoparser::parse_calldata(calldata, Some(ETHEREUM_RPC.to_string()));
     } else {
-        memoparser::parse_calldata(unprefixed, ETHEREUM_RPC.to_string());
+        memoparser::parse_calldata(unprefixed, Some(ETHEREUM_RPC.to_string()));
     }
 
     Ok(())

@@ -41,6 +41,7 @@ impl fmt::Display for TxType {
     }
 }
 
+#[derive(Clone)]
 pub struct Memo {
     pub fee: u64,
     pub amount: u64,        // withdrawal only field
