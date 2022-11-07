@@ -8,7 +8,9 @@ use clap::Parser;
 pub use memo::TxType;
 pub use memo::Memo;
 
-pub const ETHEREUM_RPC: &str = "https://kovan.infura.io/v3/84842078b09946638c03157f83405213";
+//pub const ETHEREUM_RPC: &str = "https://kovan.infura.io/v3/84842078b09946638c03157f83405213";
+pub const ETHEREUM_RPC: &str = "https://rpc.sepolia.org";
+//pub const ETHEREUM_RPC: &str = "https://polygon-rpc.com";
 
 /// Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
