@@ -54,6 +54,7 @@ pub struct Memo {
     pub keys_enc: Vec<u8>,          // 32 * items_num + 16
     pub acc_enc: Vec<u8>,           // 86 bytes
     pub notes_enc: Vec<Vec<u8>>,    // 108 x (items_num - 1) bytes
+    pub extra: Option<Vec<u8>>,  // extra tx data (tx memo)
 }
 
 impl Memo {
@@ -103,6 +104,11 @@ impl Memo {
             offset += 108;
         }
 
+        let mut extra: Option<Vec<u8>> = None;
+        if offset < block.len() {
+            extra = Some(block[offset..block.len()].to_vec());
+        }
+
         Memo {
             fee: u64::from_str_radix(&hex::encode(fee_raw), 16).unwrap(),
             amount: u64::from_str_radix(&hex::encode(amount_raw), 16).unwrap_or(0),
@@ -116,6 +122,7 @@ impl Memo {
             keys_enc: keys_enc_raw,
             acc_enc: acc_enc_raw,
             notes_enc: notes_enc_raw,
+            extra: extra,
         }
     }
 }

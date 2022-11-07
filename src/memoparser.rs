@@ -76,7 +76,6 @@ impl Display for Calldata {
             let dt_utc = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(self.memo.deadline as i64, 0), Utc);
             let dt_local: DateTime<Local> = DateTime::from(dt_utc);
             result += &format!("Deadline       : {} (0x{:x})\n", dt_local.format("%Y-%m-%d %H:%M:%S"), &self.memo.deadline);
-            result += &format!("Holder addr    : 0x{}\n", &self.memo.holder);
         }
         result += &format!("Account hash   : {}\n", hex::encode(&self.memo.acc_hash));
         for (note_idx, note_hash) in self.memo.notes_hashes.iter().enumerate() {
@@ -90,6 +89,17 @@ impl Display for Calldata {
             //println!("Encrypt note #{}: {}", note_idx, hex::encode(enc_note));
             result += &print_long_hex(format!("Encrypt note #{}: ", note_idx), hex::encode(enc_note), 64);
         };
+
+        if self.memo.extra.is_some() {
+            let extra = self.memo.extra.as_ref().unwrap();
+
+            result += &print_long_hex("Additional data: ".to_string(), hex::encode(extra), 64);
+
+            if let Ok(str_repr) = String::from_utf8(extra.to_vec()) {
+                result += &format!("        [UTF-8]: {}\n", str_repr);
+            }
+        }
+
         result += &format!("----------------------------------------------------------------------------------\n");
         if !self.ecdsa_sign.is_empty() {
             result += &print_long_hex("ECDSA signature: ".to_string(), hex::encode(&self.ecdsa_sign.to_vec()), 64);
@@ -181,7 +191,6 @@ pub fn parse_calldata(
         };
 
         ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
-        // cur_offset += 64;
 
         if rpc.is_some() {
             addr = Some(ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc.unwrap()));
@@ -193,7 +202,6 @@ pub fn parse_calldata(
         };
 
         ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
-        // cur_offset += 64;
     }
 
     Ok(Calldata {
