@@ -1,6 +1,6 @@
 pub(crate) use std::fmt;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TxType {
     Deposit = 0,
     Transfer = 1,
@@ -36,6 +36,38 @@ impl fmt::Display for TxType {
             TxType::Transfer => write!(f, "Transfer"),
             TxType::Withdrawal => write!(f, "Withdrawal"),
             TxType::DepositPermittable => write!(f, "DepositPermittable"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum TxSelector {
+    Transact,
+    AppendDirectDeposits,
+}
+
+impl TxSelector {
+    pub fn from_bytes(bytes: &[u8]) -> Option<TxSelector> {
+        match hex::encode(bytes).as_str() {
+            "af989083" => Some(TxSelector::Transact),
+            "1dc4cb33" => Some(TxSelector::AppendDirectDeposits),
+            _ => None,
+        }
+    }
+
+    pub fn to_hex(&self) -> String {
+        match self {
+            TxSelector::Transact => "af989083".to_string(),
+            TxSelector::AppendDirectDeposits => "af989083".to_string(),
+        }
+    }
+}
+
+impl fmt::Display for TxSelector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TxSelector::Transact => write!(f, "transact"),
+            TxSelector::AppendDirectDeposits => write!(f, "appendDirectDeposits"),
         }
     }
 }

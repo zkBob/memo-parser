@@ -1,16 +1,15 @@
 mod memoparser;
 mod memo;
 mod ethutils;
+mod errors;
 
-//use std::io::Result;
+use dotenv::dotenv;
 use tokio;
+use colored::Colorize;
 use clap::Parser;
+
 pub use memo::TxType;
 pub use memo::Memo;
-
-//pub const ETHEREUM_RPC: &str = "https://kovan.infura.io/v3/84842078b09946638c03157f83405213";
-pub const ETHEREUM_RPC: &str = "https://rpc.sepolia.org";
-//pub const ETHEREUM_RPC: &str = "https://polygon-rpc.com";
 
 /// Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
@@ -21,6 +20,12 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> web3::Result<()> {
+    // Reading environment variables
+    dotenv().ok();
+    let rpc_url = std::env::var("RPC_URL").expect("RPC_URL must be set");
+    let network = std::env::var("NETWORK").unwrap_or("unknown".to_string());
+
+    // Reading the single command line argument
     let args = Cli::parse();
     let calldata = &args.calldata_or_tx_hash;
 
@@ -32,13 +37,28 @@ async fn main() -> web3::Result<()> {
     
     if unprefixed.len() == 64 {
         // It's probably a transaction hash => fetch calldata
-        let calldata = ethutils::get_calldata(unprefixed, ETHEREUM_RPC.to_string()).await.unwrap();
-        println!("\nFetched calldata: {} bytes", calldata.len() / 2);
-        let calldata = memoparser::parse_calldata(hex::decode(calldata).unwrap(), Some(ETHEREUM_RPC.to_string()));
-        println!("{}", calldata.unwrap());
+        println!("\nWorking on {} network...", network.yellow());
+
+        let calldata = ethutils::get_calldata(unprefixed, rpc_url.to_string()).await;
+        match calldata {
+            Ok(calldata) => {
+                println!("Fetched calldata: {} bytes", calldata.len() / 2);
+                let parsed = memoparser::parse_calldata(hex::decode(calldata).unwrap(), Some(rpc_url.to_string()));
+                match parsed {
+                    Ok(parsed) => println!("{}", parsed),
+                    Err(err) => println!("{}: {}", "ERROR".red(), err),
+                }
+            },
+            Err(err) => {
+                println!("{}: {}", "ERROR".red(), err);
+            }
+        }
     } else {
-        let calldata = memoparser::parse_calldata(hex::decode(unprefixed).unwrap(), Some(ETHEREUM_RPC.to_string()));
-        println!("{}", calldata.unwrap());
+        let parsed = memoparser::parse_calldata(hex::decode(calldata).unwrap(), Some(rpc_url.to_string()));
+        match parsed {
+            Ok(parsed) => println!("{}", parsed),
+            Err(err) => println!("{}: {}", "ERROR".red(), err),
+        }
     }
 
     Ok(())
