@@ -10,7 +10,7 @@ cd memo-parser/
 cargo run <calldata_or_tx_hash>
 ```
 
-To change network you should select appropriate file (`.env.sepolia` or `.env.polygon`) and copy in into `.env` file with owerwrite. E.g. to swith tool for Sepolia testnet type:
+To change network you should select appropriate file (`.env.sepolia` or `.env.polygon`) and copy in into `.env` file with owerwrite. E.g. to swith tool to Sepolia testnet:
 
 ```bash
 cp .env.sepolia .env
@@ -19,10 +19,10 @@ cp .env.sepolia .env
 or to switch to the mainnet Polygon network:
 
 ```bash
-cp .env.sepolia .env
+cp .env.polygon .env
 ```
 
-You also can directly modify RPC_URL in the `.env` file to change RPC node manually
+You also can directly modify `RPC_URL` variable in the `.env` file to change RPC node manually
 
 
 ## Example
