@@ -1,15 +1,11 @@
-mod memoparser;
-mod memo;
 mod ethutils;
 mod errors;
 
 use dotenv::dotenv;
+use memo_parser::calldata::ParsedCalldata;
 use tokio;
 use colored::Colorize;
 use clap::Parser;
-
-pub use memo::TxType;
-pub use memo::Memo;
 
 /// Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
@@ -34,8 +30,10 @@ async fn main() -> web3::Result<()> {
         unprefixed.remove(0);
         unprefixed.remove(0);
     }
-    
-    if unprefixed.len() == 64 {
+
+    if hex::decode(&unprefixed).is_err() {
+        println!("{}: hex string is incorrect, please check it", "ERROR".red());
+    } else if unprefixed.len() == 64 {
         // It's probably a transaction hash => fetch calldata
         println!("\nWorking on {} network...", network.yellow());
 
@@ -43,7 +41,7 @@ async fn main() -> web3::Result<()> {
         match calldata {
             Ok(calldata) => {
                 println!("Fetched calldata: {} bytes", calldata.len() / 2);
-                let parsed = memoparser::parse_calldata(hex::decode(calldata).unwrap(), Some(rpc_url.to_string()));
+                let parsed = ParsedCalldata::new(hex::decode(calldata).unwrap(), Some(rpc_url.to_string()));
                 match parsed {
                     Ok(parsed) => println!("{}", parsed),
                     Err(err) => println!("{}: {}", "ERROR".red(), err),
@@ -53,12 +51,14 @@ async fn main() -> web3::Result<()> {
                 println!("{}: {}", "ERROR".red(), err);
             }
         }
-    } else {
-        let parsed = memoparser::parse_calldata(hex::decode(calldata).unwrap(), Some(rpc_url.to_string()));
+    } else if unprefixed.len() >= 8 {
+        let parsed = ParsedCalldata::new(hex::decode(&unprefixed).unwrap(), Some(rpc_url.to_string()));
         match parsed {
             Ok(parsed) => println!("{}", parsed),
             Err(err) => println!("{}: {}", "ERROR".red(), err),
         }
+    } else {
+        println!("{}: input data too short", "ERROR".red());
     }
 
     Ok(())

@@ -1,5 +1,5 @@
 use web3;
-use web3::types::{Recovery, TransactionId, H256};
+use web3::types::{TransactionId, H256};
 
 use crate::errors::MemoParserError;
 extern crate hex;
@@ -9,7 +9,7 @@ pub async fn get_calldata(tx_hash: String, rpc: String) -> Result<String, MemoPa
     let web3 = web3::Web3::new(transport);
 
     if tx_hash.len() != 64 {
-        return Err(MemoParserError::InternalError("Incorrect tx hash".to_string()))
+        return Err(MemoParserError::ParseError("Incorrect tx hash".to_string()))
     }
 
     let fixed_hash_bytes: [u8; 32] = hex::decode(tx_hash)
@@ -26,32 +26,3 @@ pub async fn get_calldata(tx_hash: String, rpc: String) -> Result<String, MemoPa
     }
 }
 
-pub fn ecrecover(data: Vec<u8>, signature: Vec<u8>, rpc: String) -> String {
-    let transport = web3::transports::Http::new(&rpc).unwrap();
-    let web3 = web3::Web3::new(transport);
-
-    let recovery;
-    if signature.len() == 64 {
-        let r = H256::from_slice(&signature[0..32]);
-        let v = signature[32] >> 7;
-        let mut s_data: [u8; 32] = signature[32..64].try_into().unwrap();
-        s_data[0] &= 0x7f;
-        let s = H256::from_slice(&s_data);
-        recovery = Recovery::new(data, 27 + v as u64, r, s);
-    } else if signature.len() == 65 {
-        recovery = match Recovery::from_raw_signature(data, signature) {
-            Ok(rec) => rec,
-            Err(_error) => return "signature_error".to_string(),
-        }
-    } else {
-        return "<incorrect_signature>".to_string();
-    }
-
-    let addr_res = web3.accounts().recover(recovery);
-
-    if addr_res.is_ok() {
-        return hex::encode(addr_res.unwrap().0);
-    } else {
-        return "unavailable".to_string();
-    }
-}

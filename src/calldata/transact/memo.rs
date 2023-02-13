@@ -40,38 +40,6 @@ impl fmt::Display for TxType {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum TxSelector {
-    Transact,
-    AppendDirectDeposits,
-}
-
-impl TxSelector {
-    pub fn from_bytes(bytes: &[u8]) -> Option<TxSelector> {
-        match hex::encode(bytes).as_str() {
-            "af989083" => Some(TxSelector::Transact),
-            "1dc4cb33" => Some(TxSelector::AppendDirectDeposits),
-            _ => None,
-        }
-    }
-
-    pub fn to_hex(&self) -> String {
-        match self {
-            TxSelector::Transact => "af989083".to_string(),
-            TxSelector::AppendDirectDeposits => "af989083".to_string(),
-        }
-    }
-}
-
-impl fmt::Display for TxSelector {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            TxSelector::Transact => write!(f, "transact"),
-            TxSelector::AppendDirectDeposits => write!(f, "appendDirectDeposits"),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct Memo {
     pub fee: u64,
