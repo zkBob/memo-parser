@@ -1,6 +1,6 @@
 # memo-parser
 
-A small tool to parse zkBob Pool transaction's calldata. The following transactions are ccurrently supported:
+A small tool to parse zkBob Pool transaction's calldata. The following transactions are currently supported:
 
 | Contract method                                                    | Selector | Description                                                                                                |
 |--------------------------------------------------------------------|----------|------------------------------------------------------------------------------------------------------------|
