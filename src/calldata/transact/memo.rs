@@ -1,6 +1,6 @@
 pub(crate) use std::fmt;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TxType {
     Deposit = 0,
     Transfer = 1,
