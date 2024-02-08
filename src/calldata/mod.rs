@@ -15,6 +15,7 @@ use self::dd::{
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TxSelector {
     Transact,
+    TransactV2,
     DirectDeposit,
     AppendDirectDeposits,
     RefundDirectDeposit,
@@ -25,6 +26,7 @@ impl TxSelector {
     pub fn from_bytes(bytes: &[u8]) -> Option<TxSelector> {
         match hex::encode(bytes).as_str() {
             "af989083" => Some(TxSelector::Transact),
+            "5fd28f8c" => Some(TxSelector::TransactV2),
             "02592d37" => Some(TxSelector::DirectDeposit),
             "1dc4cb33" => Some(TxSelector::AppendDirectDeposits),
             "d7f59caa" => Some(TxSelector::RefundDirectDeposit),
@@ -36,6 +38,7 @@ impl TxSelector {
     pub fn to_hex(&self) -> String {
         match self {
             TxSelector::Transact => "af989083".to_string(),
+            TxSelector::TransactV2 => "5fd28f8c".to_string(),
             TxSelector::DirectDeposit => "02592d37".to_string(),
             TxSelector::AppendDirectDeposits => "1dc4cb33".to_string(),
             TxSelector::RefundDirectDeposit => "d7f59caa".to_string(),
@@ -48,6 +51,7 @@ impl fmt::Display for TxSelector {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             TxSelector::Transact => write!(f, "transact"),
+            TxSelector::TransactV2 => write!(f, "transactV2"),
             TxSelector::DirectDeposit => write!(f, "directDeposit"),
             TxSelector::AppendDirectDeposits => write!(f, "appendDirectDeposits"),
             TxSelector::RefundDirectDeposit |
@@ -59,6 +63,7 @@ impl fmt::Display for TxSelector {
 
 pub enum CalldataContent {
     Transact(CalldataTransact),
+    TransactV2(CalldataTransact),
     DirectDeposit(CalldataDirectDeposit),
     AppendDirectDeposit(CalldataAppendDirectDeposit),
     RefundDirectDeposit(CalldataRefundDirectDeposit),
@@ -68,6 +73,7 @@ impl Display for CalldataContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CalldataContent::Transact(content) => write!(f, "{}", content),
+            CalldataContent::TransactV2(content) => write!(f, "{}", content),
             CalldataContent::DirectDeposit(content) => write!(f, "{}", content),
             CalldataContent::AppendDirectDeposit(content) => write!(f, "{}", content),
             CalldataContent::RefundDirectDeposit(content) => write!(f, "{}", content),
@@ -99,6 +105,10 @@ impl ParsedCalldata {
             TxSelector::Transact => {
                 let data = CalldataTransact::new(&bytes[..], rpc)?;
                 Ok(CalldataContent::Transact(data))
+            },
+            TxSelector::TransactV2 => {
+                let data = CalldataTransact::new_v2(&bytes[..], rpc)?;
+                Ok(CalldataContent::TransactV2(data))
             },
             TxSelector::DirectDeposit => {
                 let data = CalldataDirectDeposit::new(&bytes[..])?;
