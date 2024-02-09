@@ -83,24 +83,17 @@ impl CalldataTransact {
         let mut ecdsa_sign: Vec<u8> = Vec::new();
         let cur_offset = 644 + memo_size as usize;
         let mut addr = None;
-        if tx_type == TxType::Deposit {
+        if tx_type == TxType::Deposit || tx_type == TxType::DepositPermittable {
             let rem_len = bytes.len() - cur_offset;
             if rem_len < 64 {
                 return Err(MemoParserError::ParseError(format!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset)));
             };
     
             ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
-    
-            if rpc.is_some() {
+
+            if tx_type == TxType::Deposit && rpc.is_some() {
                 addr = Some(ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc.unwrap()));
             }
-        } else if tx_type == TxType::DepositPermittable {
-            let rem_len = bytes.len() - cur_offset;
-            if rem_len < 64 {
-                return Err(MemoParserError::ParseError(format!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset)));
-            };
-    
-            ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
         }
     
         Ok(CalldataTransact {
@@ -122,81 +115,72 @@ impl CalldataTransact {
     }
 
     pub fn new_v2(bytes: &[u8], rpc: Option<String>) -> Result<Self, MemoParserError> {
-        if bytes.len() < 644 {
+        if bytes.len() < 357 {
             return Err(MemoParserError::ParseError(format!(
-                "Incorrect calldata length! It must be at least 644 bytes for transact() method"
+                "Incorrect calldata length! It must be at least 357 bytes for transact() method"
             )));
         }
     
-        let nullifier = &bytes[4..36];
-        let commit = &bytes[36..68];
-        let index_raw = &bytes[68..74];
+        let version = bytes[4];
+        if version != 2 {
+            return Err(MemoParserError::ParseError(format!("Unsupported calldata version ({})", version)));
+        }
+        let nullifier = &bytes[5..37];
+        let commit = &bytes[37..69];
+        let index_raw = &bytes[69..75];
         let index = u64::from_str_radix(&hex::encode(index_raw), 16).unwrap();
     
-        let delta_energy_raw = &bytes[74..88];
+        let delta_energy_raw = &bytes[75..89];
         let mut delta_energy = i128::from_str_radix(&hex::encode(delta_energy_raw), 16).unwrap();
         if delta_energy > ((1 as i128) << 111) {
             // process delta negative values
             delta_energy -= (1 as i128) << 112;
         }
     
-        let delta_token_raw = &bytes[88..96];
+        let delta_token_raw = &bytes[89..97];
         let mut delta_token = i128::from_str_radix(&hex::encode(delta_token_raw), 16).unwrap();
         if delta_token > ((1 as i128) << 63) {
             // process delta negative values
             delta_token -= (1 as i128) << 64;
         }
     
-        let tx_proof = &bytes[96..352];
-        let root_after = &bytes[352..384];
-        let tree_proof = &bytes[384..640];
-        let tx_type_raw = &bytes[640..642];
+        let tx_proof = &bytes[97..353];
+        let tx_type_raw = &bytes[353..355];
         let tx_type = TxType::from_u32(u32::from_str_radix(&hex::encode(tx_type_raw), 16).unwrap());
-        let memo_size_raw = &bytes[642..644];
+        let memo_size_raw = &bytes[355..357];
         let memo_size = u32::from_str_radix(&hex::encode(memo_size_raw), 16).unwrap();
     
-        if bytes.len() < 644 + memo_size as usize {
-            return Err(MemoParserError::ParseError(format!(
-                "Incorrect calldata length! Memo block corrupted"
-            )));
+        if bytes.len() < 357 + memo_size as usize {
+            return Err(MemoParserError::ParseError(format!("Incorrect calldata length! Memo block corrupted")));
         }
     
         let is_extra_fields: bool =
             tx_type == TxType::Withdrawal || tx_type == TxType::DepositPermittable;
-        if (!is_extra_fields && memo_size < 210) || (is_extra_fields && memo_size < 238) {
-            return Err(MemoParserError::ParseError(format!(
-                "Incorrect memo block length"
-            )));
+        if (!is_extra_fields && memo_size < 264) || (is_extra_fields && memo_size < 292) {
+            return Err(MemoParserError::ParseError(format!("Incorrect memo block length")));
         }
     
-        let memo = Memo::parse_memoblock(Vec::from(&bytes[644..(644 + memo_size) as usize]), tx_type);
+        let memo = Memo::parse_memoblock(Vec::from(&bytes[357..(357 + memo_size) as usize]), tx_type);
         let memo_clone = memo.clone();
     
         let mut ecdsa_sign: Vec<u8> = Vec::new();
         let cur_offset = 644 + memo_size as usize;
         let mut addr = None;
-        if tx_type == TxType::Deposit {
+        if tx_type == TxType::Deposit || tx_type == TxType::DepositPermittable {
             let rem_len = bytes.len() - cur_offset;
             if rem_len < 64 {
                 return Err(MemoParserError::ParseError(format!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset)));
             };
     
             ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
-    
-            if rpc.is_some() {
+
+            if tx_type == TxType::Deposit && rpc.is_some() {
                 addr = Some(ecrecover(nullifier.to_vec(), ecdsa_sign.to_vec(), rpc.unwrap()));
             }
-        } else if tx_type == TxType::DepositPermittable {
-            let rem_len = bytes.len() - cur_offset;
-            if rem_len < 64 {
-                return Err(MemoParserError::ParseError(format!("Cannot find correct ECDSA signature for deposit transaction. It should be 64 bytes length (got {})\n", bytes.len() - cur_offset)));
-            };
-    
-            ecdsa_sign = bytes[cur_offset..cur_offset + 64].to_vec();
         }
     
         Ok(CalldataTransact {
-            version: 2,
+            version,
             nullifier: nullifier.to_vec(),
             out_commit: commit.to_vec(),
             tx_index: index,
@@ -205,11 +189,11 @@ impl CalldataTransact {
             tx_proof: tx_proof.to_vec(),
             root_after: [].to_vec(),
             tree_proof: [].to_vec(),
-            tx_type: tx_type,
-            memo_size: memo_size,
+            tx_type,
+            memo_size,
             memo: memo_clone,
-            ecdsa_sign: ecdsa_sign,
-            addr: addr,
+            ecdsa_sign,
+            addr,
         })
     }
 }
@@ -224,13 +208,17 @@ impl Display for CalldataTransact {
         result += &format!("Token delta     : {} Gwei (0x{:x})\n", &self.token_amount.separate_with_commas(), &self.token_amount);
         result += &print_long_hex("Tx proof        : ".to_string(), hex::encode(&self.tx_proof), 64);
         result += &format!("\n");
-        result += &print_long_hex("Tree proof      : ".to_string(), hex::encode(&self.tree_proof), 64);
-        result += &format!("\n");
-        result += &format!("New Merkle Root : {}\n", hex::encode(&self.root_after));
+        if self.tree_proof.len() > 0 {
+            result += &print_long_hex("Tree proof      : ".to_string(), hex::encode(&self.tree_proof), 64);
+            result += &format!("\n");
+        }
+        if self.root_after.len() > 0 {
+            result += &format!("New Merkle Root : {}\n", hex::encode(&self.root_after));
+        }
         result += &format!("Tx type         : {} ({})\n", &self.tx_type.to_string(), &self.tx_type.to_u32());
         result += &format!("Memo size       : {} bytes\n", &self.memo_size);
         result += &format!("----------------------------------- MEMO BLOCK -----------------------------------\n");
-        result += &format!("Tx fee          : {} (0x{:x})\n", &self.memo.fee.separate_with_commas(), &self.memo.fee);
+        result += &format!("Tx fee          : {} (0x{:x})\n", &self.memo.proxy_fee.separate_with_commas(), &self.memo.proxy_fee);
         result += &format!("Items number    : {}\n", &self.memo.items_num);
         
         match self.tx_type {

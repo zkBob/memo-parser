@@ -1,5 +1,7 @@
 pub(crate) use std::fmt;
 
+use crate::errors::MemoParserError;
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TxType {
     Deposit = 0,
@@ -40,27 +42,88 @@ impl fmt::Display for TxType {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum MessageEncryption {
+    ECDH = 0,
+    Plain = 1,
+    Symmetric = 2,
+}
+
+impl MessageEncryption {
+    pub fn from_u16(value: u16) -> MessageEncryption {
+        match value {
+            0 => MessageEncryption::ECDH,
+            1 => MessageEncryption::Plain,
+            2 => MessageEncryption::Symmetric,
+            _ => panic!("Unknown message encryption scheme ({})", value),
+        }
+    }
+
+    pub fn to_u16(&self) -> u32 {
+        match self {
+            MessageEncryption::ECDH => 0,
+            MessageEncryption::Plain => 1,
+            MessageEncryption::Symmetric => 2,
+        }
+    }
+}
+
+impl fmt::Display for MessageEncryption {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MessageEncryption::ECDH => write!(f, "ECDH scheme"),
+            MessageEncryption::Plain => write!(f, "Plain (DD)"),
+            MessageEncryption::Symmetric => write!(f, "Symmetric scheme"),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Memo {
-    pub fee: u64,
+    // Tx specific
+    pub proxy_address: Option<String>,
+    pub proxy_fee: u64,
+    pub prover_fee: Option<u64>,
     pub amount: u64,      // withdrawal only field
     pub receiver: String, // withdrawal only field
     pub deadline: u64,    // permittable deposit only field
     pub holder: String,   // permittable deposit only field
-    pub items_num: u32,
+    // message
+    pub message_size: u16,
+    pub items_num: u16,
+    pub enc_scheme: MessageEncryption,
     pub acc_hash: Vec<u8>,
     pub notes_hashes: Vec<Vec<u8>>, // 32 x (items_num - 1) bytes
-    pub a_p: Vec<u8>,               // 32 bytes
+    pub a_p: Vec<u8>,               // 32 bytes [ECDH scheme only]
+    pub nonce: Vec<u8>,             // 24 bytes [symmetric scheme only]
     pub keys_enc: Vec<u8>,          // 32 * items_num + 16
     pub acc_enc: Vec<u8>,           // 86 bytes
     pub notes_enc: Vec<Vec<u8>>,    // 108 x (items_num - 1) bytes
+    // extra transaction data
     pub extra: Option<Vec<u8>>,  // extra tx data (tx memo)
 }
 
 impl Memo {
-    pub fn parse_memoblock(block: Vec<u8>, txtype: TxType) -> Memo {
-        let fee_raw = &block[0..8];
-        let mut offset: usize = 8;
+    pub fn parse_memoblock(block: Vec<u8>, txtype: TxType, calldata_version: u8) -> Result<Memo, MemoParserError> {
+        let mut offset: usize = 0;
+        let mut proxy_raw: Vec<u8> = [].to_vec();
+        let mut proxy_fee: u64  = 0;
+        let mut prover_fee: u64  = 0;
+        match calldata_version {
+            1 => {
+                proxy_fee = u64::from_str_radix(&hex::encode(&block[0..8]), 16).unwrap();
+                offset = 8;
+            },
+            2 => {
+                proxy_raw = block[0..20].to_vec();
+                proxy_fee = u64::from_str_radix(&hex::encode(&block[20..28]), 16).unwrap();
+                prover_fee = u64::from_str_radix(&hex::encode(&block[28..36]), 16).unwrap();
+                offset = 36;
+            },
+            _ => {
+                // TODO: return error
+            }
+        }
 
         let mut amount_raw: Vec<u8> = Vec::new();
         let mut receiver_raw: Vec<u8> = Vec::new();
@@ -77,8 +140,12 @@ impl Memo {
         }
 
         let items_num_raw = &block[offset..offset + 1];
-        let items_num = u32::from_str_radix(&hex::encode(items_num_raw), 16).unwrap();
-        offset += 4;
+        let items_num = u16::from_str_radix(&hex::encode(items_num_raw), 16).unwrap();
+        offset += 2;
+
+        let enc_scheme_raw = &block[offset..offset + 1];
+        let enc_scheme = MessageEncryption::from_u16(u16::from_str_radix(&hex::encode(enc_scheme_raw), 16).unwrap());
+        offset += 2;
 
         let acc_hash_raw = block[offset..offset + 32].to_vec();
         offset += 32;
@@ -89,8 +156,21 @@ impl Memo {
             offset += 32;
         }
 
-        let a_p = block[offset..offset + 32].to_vec();
-        offset += 32;
+        let mut a_p = [].to_vec();
+        let mut nonce = [].to_vec();
+        match enc_scheme {
+            MessageEncryption::ECDH => {
+                a_p = block[offset..offset + 32].to_vec();
+                offset += 32;
+            },
+            MessageEncryption::Symmetric => {
+                nonce = block[offset..offset + 24].to_vec();
+                offset += 24;
+            },
+            _ => {
+                return Err(MemoParserError::ParseError(format!("Unsupported message encryption scheme for memo block ({})", enc_scheme)));
+            }
+        }
 
         let keys_enc_raw = block[offset..offset + (items_num as usize) * 32 + 16].to_vec();
         offset += (items_num as usize) * 32 + 16;
@@ -109,13 +189,16 @@ impl Memo {
             extra = Some(block[offset..block.len()].to_vec());
         }
 
-        Memo {
-            fee: u64::from_str_radix(&hex::encode(fee_raw), 16).unwrap(),
+        Ok(Memo {
+            proxy_address: if calldata_version == 1 { None } else {Some(proxy_raw) },
+            proxy_fee,
+            prover_fee: 
             amount: u64::from_str_radix(&hex::encode(amount_raw), 16).unwrap_or(0),
             receiver: hex::encode(receiver_raw),
             deadline: u64::from_str_radix(&hex::encode(deadline_raw), 16).unwrap_or(0),
             holder: hex::encode(holder_raw),
-            items_num: items_num,
+            items_num,
+            enc_scheme,
             acc_hash: acc_hash_raw,
             notes_hashes: notes_hashes_raw,
             a_p: a_p,
@@ -123,7 +206,7 @@ impl Memo {
             acc_enc: acc_enc_raw,
             notes_enc: notes_enc_raw,
             extra: extra,
-        }
+        })
     }
 }
 
@@ -136,7 +219,7 @@ mod tests {
         let data = "00000000009896800000000062e15368ffcf8fdee72ac11b5c542428b35eef5769c409f00100000087fb41aaa56d16e7d9ec4c59c402c83267456fa38977a727de21b91fd8bf7b1c1f96bc9c905604325ce22215362500952a9dacc358aa744a7723cddc55e03830c7386d956d3f810dcca3370fcd913c318009e4a8373821146a781be3b0a4360a65411d2b21821dfdd09f64da7ac3c7b16a55d62b777eacedf4d8838fde72d0fe0e298e4fc9c9ae9db8e7c40d9ccbfd7182819501776d2c2101a29bb8379b8e325ceff28aea04e421230f9331250f335b0a2c1bcac00ade1702c0d193ec8af996bf8010289969";
         let res = hex::decode(data);
         let parsed = Memo::parse_memoblock(res.unwrap(), TxType::DepositPermittable);
-        assert_eq!(parsed.fee, 10000000);
+        assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);
         assert_eq!(parsed.receiver, "");
         assert_eq!(parsed.deadline, 1658934120);
@@ -183,7 +266,7 @@ mod tests {
         let data = "000000000098968002000000b5b9df94791305ea7563234b563b01db73d70ff02a41b306b9eea01197fd942c850f816d1835fa3bdadbb223367e1344533e1d4e0cbd90f36c067589266b8802cc6bdf18540b74d7aed60bd2f176e01cb71c40c74065fe94ca6e42c511b3341b39f54533eeb239ea3957dd62200dba111b4dd38bc5d51b52582d5ad7d41f87be64306ce0615d3cffba77e6dc1b8e7d59f4553cbee37744a6888a1f88dfbd33c98428877a066d3fd734ceda45071fe3f8a3a7a98a18d83405d180d7b1460cf7e73f871a55e26d4397e33cc3fc9c81422a448b189a660767ffc58ec13f70bf79b1ba099562c813a294673649576f910db169db800c741e079fff24f993cb35e732243911b30bc9b0b5e0d4654ff6dbb9f42614fe8943a38c7ca30e48bc048107b1ef9e7e24d51f99ab65faf146222dc1de58069be027a8a5e2b978aaf2a5397fff3a563e96558a66018e59612b740983bdc81d5612416cf202aad6f0ad572a93200915ecac2cb77bbca594ce41a255935bfa4d";
         let res = hex::decode(data);
         let parsed = Memo::parse_memoblock(res.unwrap(), TxType::Transfer);
-        assert_eq!(parsed.fee, 10000000);
+        assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);
         assert_eq!(parsed.receiver, "");
         assert_eq!(parsed.deadline, 0);
@@ -249,7 +332,7 @@ mod tests {
         let res = hex::decode(data);
         let parsed = Memo::parse_memoblock(res.unwrap(), TxType::Withdrawal);
 
-        assert_eq!(parsed.fee, 10000000);
+        assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);
         assert_eq!(parsed.receiver, "ffcf8fdee72ac11b5c542428b35eef5769c409f0");
         assert_eq!(parsed.deadline, 0);
