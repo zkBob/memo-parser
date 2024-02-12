@@ -1,6 +1,8 @@
 use web3::types::{Recovery, H256};
+use crate::ethutils::bytes_to_address;
 
 pub fn ecrecover(data: Vec<u8>, signature: Vec<u8>, rpc: String) -> String {
+    // TODO: support Tron recovery
     let transport = web3::transports::Http::new(&rpc).unwrap();
     let web3 = web3::Web3::new(transport);
 
@@ -21,10 +23,11 @@ pub fn ecrecover(data: Vec<u8>, signature: Vec<u8>, rpc: String) -> String {
         return "<incorrect_signature>".to_string();
     }
 
+    
     let addr_res = web3.accounts().recover(recovery);
 
     if addr_res.is_ok() {
-        return hex::encode(addr_res.unwrap().0);
+        return bytes_to_address(&addr_res.unwrap().0.to_vec(), crate::ethutils::L1AddressType::Ethereum).unwrap();
     } else {
         return "unavailable".to_string();
     }

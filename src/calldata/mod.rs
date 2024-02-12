@@ -107,7 +107,7 @@ impl ParsedCalldata {
                 Ok(CalldataContent::Transact(data))
             },
             TxSelector::TransactV2 => {
-                let data = CalldataTransact::new_v2(&bytes[..], rpc)?;
+                let data = CalldataTransact::new(&bytes[..], rpc)?;
                 Ok(CalldataContent::TransactV2(data))
             },
             TxSelector::DirectDeposit => {

@@ -1,6 +1,6 @@
 pub(crate) use std::fmt;
 
-use crate::errors::MemoParserError;
+use crate::{errors::MemoParserError, ethutils::{bytes_to_address, L1AddressType}};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TxType {
@@ -81,15 +81,18 @@ impl fmt::Display for MessageEncryption {
 #[derive(Clone)]
 pub struct Memo {
     // Tx specific
-    pub proxy_address: Option<String>,
+    pub proxy_address_raw: Vec<u8>,
+    pub proxy_address: String,
     pub proxy_fee: u64,
     pub prover_fee: Option<u64>,
-    pub amount: u64,      // withdrawal only field
-    pub receiver: String, // withdrawal only field
-    pub deadline: u64,    // permittable deposit only field
-    pub holder: String,   // permittable deposit only field
+    pub amount: u64,           // withdrawal only field
+    pub receiver_raw: Vec<u8>, // withdrawal only field
+    pub receiver: String,      // withdrawal only field
+    pub deadline: u64,       // permittable deposit only field
+    pub holder_raw: Vec<u8>, // permittable deposit only field
+    pub holder: String,      // permittable deposit only field
     // message
-    pub message_size: u16,
+    pub message_size: Option<u16>,
     pub items_num: u16,
     pub enc_scheme: MessageEncryption,
     pub acc_hash: Vec<u8>,
@@ -105,9 +108,9 @@ pub struct Memo {
 
 impl Memo {
     pub fn parse_memoblock(block: Vec<u8>, txtype: TxType, calldata_version: u8) -> Result<Memo, MemoParserError> {
-        let mut offset: usize = 0;
+        let mut offset: usize;
         let mut proxy_raw: Vec<u8> = [].to_vec();
-        let mut proxy_fee: u64  = 0;
+        let proxy_fee: u64;
         let mut prover_fee: u64  = 0;
         match calldata_version {
             1 => {
@@ -121,7 +124,9 @@ impl Memo {
                 offset = 36;
             },
             _ => {
-                // TODO: return error
+                return Err(MemoParserError::ParseError(
+                    format!("Incorrect calldata version ({})", calldata_version)
+                ));
             }
         }
 
@@ -137,6 +142,13 @@ impl Memo {
             deadline_raw = block[offset..offset + 8].to_vec();
             holder_raw = block[offset + 8..offset + 8 + 20].to_vec();
             offset += 28;
+        }
+
+        let mut message_size = None;
+        if calldata_version == 2 {
+            let msg_size_raw = &block[offset..offset + 1];
+            message_size = Some(u16::from_str_radix(&hex::encode(msg_size_raw), 16).unwrap());
+            offset += 2;
         }
 
         let items_num_raw = &block[offset..offset + 1];
@@ -190,18 +202,23 @@ impl Memo {
         }
 
         Ok(Memo {
-            proxy_address: if calldata_version == 1 { None } else {Some(proxy_raw) },
+            proxy_address_raw: proxy_raw.clone(),
+            proxy_address: hex::encode(proxy_raw),
             proxy_fee,
-            prover_fee: 
+            prover_fee: if calldata_version == 1 { None } else { Some(prover_fee) },
             amount: u64::from_str_radix(&hex::encode(amount_raw), 16).unwrap_or(0),
-            receiver: hex::encode(receiver_raw),
+            receiver_raw: receiver_raw.clone(),
+            receiver: bytes_to_address(&receiver_raw, L1AddressType::Ethereum).unwrap(),
             deadline: u64::from_str_radix(&hex::encode(deadline_raw), 16).unwrap_or(0),
-            holder: hex::encode(holder_raw),
+            holder_raw: holder_raw.clone(),
+            holder: bytes_to_address(&holder_raw, L1AddressType::Ethereum).unwrap(),
+            message_size,
             items_num,
             enc_scheme,
             acc_hash: acc_hash_raw,
             notes_hashes: notes_hashes_raw,
             a_p: a_p,
+            nonce,
             keys_enc: keys_enc_raw,
             acc_enc: acc_enc_raw,
             notes_enc: notes_enc_raw,
@@ -218,7 +235,7 @@ mod tests {
     fn parse_deposit_permittable() {
         let data = "00000000009896800000000062e15368ffcf8fdee72ac11b5c542428b35eef5769c409f00100000087fb41aaa56d16e7d9ec4c59c402c83267456fa38977a727de21b91fd8bf7b1c1f96bc9c905604325ce22215362500952a9dacc358aa744a7723cddc55e03830c7386d956d3f810dcca3370fcd913c318009e4a8373821146a781be3b0a4360a65411d2b21821dfdd09f64da7ac3c7b16a55d62b777eacedf4d8838fde72d0fe0e298e4fc9c9ae9db8e7c40d9ccbfd7182819501776d2c2101a29bb8379b8e325ceff28aea04e421230f9331250f335b0a2c1bcac00ade1702c0d193ec8af996bf8010289969";
         let res = hex::decode(data);
-        let parsed = Memo::parse_memoblock(res.unwrap(), TxType::DepositPermittable);
+        let parsed = Memo::parse_memoblock(res.unwrap(), TxType::DepositPermittable, 1).unwrap();
         assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);
         assert_eq!(parsed.receiver, "");
@@ -265,7 +282,7 @@ mod tests {
     fn parse_transfer() {
         let data = "000000000098968002000000b5b9df94791305ea7563234b563b01db73d70ff02a41b306b9eea01197fd942c850f816d1835fa3bdadbb223367e1344533e1d4e0cbd90f36c067589266b8802cc6bdf18540b74d7aed60bd2f176e01cb71c40c74065fe94ca6e42c511b3341b39f54533eeb239ea3957dd62200dba111b4dd38bc5d51b52582d5ad7d41f87be64306ce0615d3cffba77e6dc1b8e7d59f4553cbee37744a6888a1f88dfbd33c98428877a066d3fd734ceda45071fe3f8a3a7a98a18d83405d180d7b1460cf7e73f871a55e26d4397e33cc3fc9c81422a448b189a660767ffc58ec13f70bf79b1ba099562c813a294673649576f910db169db800c741e079fff24f993cb35e732243911b30bc9b0b5e0d4654ff6dbb9f42614fe8943a38c7ca30e48bc048107b1ef9e7e24d51f99ab65faf146222dc1de58069be027a8a5e2b978aaf2a5397fff3a563e96558a66018e59612b740983bdc81d5612416cf202aad6f0ad572a93200915ecac2cb77bbca594ce41a255935bfa4d";
         let res = hex::decode(data);
-        let parsed = Memo::parse_memoblock(res.unwrap(), TxType::Transfer);
+        let parsed = Memo::parse_memoblock(res.unwrap(), TxType::Transfer, 1).unwrap();
         assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);
         assert_eq!(parsed.receiver, "");
@@ -330,7 +347,7 @@ mod tests {
     fn parse_withdrawal() {
         let data = "00000000009896800000000000000000ffcf8fdee72ac11b5c542428b35eef5769c409f001000000b1ae14b2bd52c7616b76e5919447232ec27204fbb5090c76ecb618fe8a2b6d015062794aa7b5bfc8033c001a3fde4d3d6575c1a2953681252ff3a49af14353093fc49a480122265c9fc66b26819f1d97577f3ac2a53a884046906bb976a949db223105a0b0bf15c41dfa00e6832a9d848c869582f3432284afe008777b9f1ddfb113308f6c490ae6386201080d0dc7102ac1b3521877518442da126d47ef4072686b8a4e43e20057026959cd4952f20535ac43ecbc45846225e902b3022c89d393d8dae2241b";
         let res = hex::decode(data);
-        let parsed = Memo::parse_memoblock(res.unwrap(), TxType::Withdrawal);
+        let parsed = Memo::parse_memoblock(res.unwrap(), TxType::Withdrawal, 1).unwrap();
 
         assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);

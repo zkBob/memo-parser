@@ -1,8 +1,14 @@
 use web3;
 use web3::types::{TransactionId, H256};
+use anychain_tron::TronAddress;
 
 use crate::errors::MemoParserError;
 extern crate hex;
+
+pub enum L1AddressType {
+    Ethereum,
+    Tron,
+}
 
 pub async fn get_calldata(tx_hash: String, rpc: String) -> Result<String, MemoParserError> {
     let transport = web3::transports::Http::new(&rpc).unwrap();
@@ -26,3 +32,13 @@ pub async fn get_calldata(tx_hash: String, rpc: String) -> Result<String, MemoPa
     }
 }
 
+pub fn bytes_to_address(bytes: &Vec<u8>, addr_type: L1AddressType) -> Result<String, MemoParserError> {
+    if bytes.len() != 20 {
+        return Err(MemoParserError::ParseError("Bad address length".to_string()));
+    }
+
+    match addr_type {
+        L1AddressType::Ethereum => Ok(format!("0x{}", hex::encode(bytes))),
+        L1AddressType::Tron => Ok(TronAddress::from_bytes(&bytes.as_slice()).to_string())
+    }
+}
