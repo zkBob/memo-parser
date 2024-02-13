@@ -157,6 +157,12 @@ impl Memo {
         let items_num = u16::from_str_radix(&hex::encode(items_num_rev), 16).unwrap();
         offset += 2;
 
+        if items_num < 1 || items_num > 128 {
+            return Err(MemoParserError::ParseError(
+                format!("Incorrect items number ({}): should be in range [1..128]", items_num)
+            ));
+        }
+
         let enc_scheme_raw = &block[offset..offset + 2];
         let enc_scheme = MessageEncryption::from_u16(u16::from_str_radix(&hex::encode(enc_scheme_raw), 16).unwrap());
         offset += 2;

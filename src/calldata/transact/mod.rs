@@ -112,7 +112,7 @@ impl CalldataTransact {
             )));
         }
     
-        let memo = Memo::parse_memoblock(Vec::from(&bytes[off..(off + memo_size as usize)]), tx_type, version).unwrap();
+        let memo = Memo::parse_memoblock(Vec::from(&bytes[off..(off + memo_size as usize)]), tx_type, version)?;
         let memo_clone = memo.clone();
 
         off += memo_size as usize;
