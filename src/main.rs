@@ -40,7 +40,7 @@ async fn main() -> web3::Result<()> {
         let calldata = ethutils::get_calldata(unprefixed, rpc_url.to_string()).await;
         match calldata {
             Ok(calldata) => {
-                println!("Fetched calldata: {} bytes", calldata.len() / 2);
+                println!("Fetched calldata : {} bytes", calldata.len() / 2);
                 let parsed = ParsedCalldata::new(hex::decode(calldata).unwrap(), Some(rpc_url.to_string()));
                 match parsed {
                     Ok(parsed) => println!("{}", parsed),

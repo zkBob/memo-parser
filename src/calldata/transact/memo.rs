@@ -1,6 +1,7 @@
 pub(crate) use std::fmt;
+use crate::errors::MemoParserError;
 
-use crate::{errors::MemoParserError, ethutils::{bytes_to_address, L1AddressType}};
+use super::helper::{bytes_to_address, L1AddressType};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum TxType {
@@ -146,16 +147,17 @@ impl Memo {
 
         let mut message_size = None;
         if calldata_version == 2 {
-            let msg_size_raw = &block[offset..offset + 1];
+            let msg_size_raw = &block[offset..offset + 2];
             message_size = Some(u16::from_str_radix(&hex::encode(msg_size_raw), 16).unwrap());
             offset += 2;
         }
 
-        let items_num_raw = &block[offset..offset + 1];
-        let items_num = u16::from_str_radix(&hex::encode(items_num_raw), 16).unwrap();
+        let items_num_raw = &block[offset..offset + 2];
+        let items_num_rev: Vec<u8> = items_num_raw.iter().rev().copied().collect();
+        let items_num = u16::from_str_radix(&hex::encode(items_num_rev), 16).unwrap();
         offset += 2;
 
-        let enc_scheme_raw = &block[offset..offset + 1];
+        let enc_scheme_raw = &block[offset..offset + 2];
         let enc_scheme = MessageEncryption::from_u16(u16::from_str_radix(&hex::encode(enc_scheme_raw), 16).unwrap());
         offset += 2;
 
@@ -203,15 +205,15 @@ impl Memo {
 
         Ok(Memo {
             proxy_address_raw: proxy_raw.clone(),
-            proxy_address: hex::encode(proxy_raw),
+            proxy_address: bytes_to_address(&proxy_raw, L1AddressType::Ethereum).unwrap_or("".to_string()),
             proxy_fee,
             prover_fee: if calldata_version == 1 { None } else { Some(prover_fee) },
             amount: u64::from_str_radix(&hex::encode(amount_raw), 16).unwrap_or(0),
             receiver_raw: receiver_raw.clone(),
-            receiver: bytes_to_address(&receiver_raw, L1AddressType::Ethereum).unwrap(),
+            receiver: bytes_to_address(&receiver_raw, L1AddressType::Ethereum).unwrap_or("".to_string()),
             deadline: u64::from_str_radix(&hex::encode(deadline_raw), 16).unwrap_or(0),
             holder_raw: holder_raw.clone(),
-            holder: bytes_to_address(&holder_raw, L1AddressType::Ethereum).unwrap(),
+            holder: bytes_to_address(&holder_raw, L1AddressType::Ethereum).unwrap_or("".to_string()),
             message_size,
             items_num,
             enc_scheme,
@@ -240,7 +242,7 @@ mod tests {
         assert_eq!(parsed.amount, 0);
         assert_eq!(parsed.receiver, "");
         assert_eq!(parsed.deadline, 1658934120);
-        assert_eq!(parsed.holder, "ffcf8fdee72ac11b5c542428b35eef5769c409f0");
+        assert_eq!(parsed.holder, "0xffcf8fdee72ac11b5c542428b35eef5769c409f0");
         assert_eq!(parsed.items_num, 1);
         assert_eq!(
             parsed.acc_hash,
@@ -351,7 +353,7 @@ mod tests {
 
         assert_eq!(parsed.proxy_fee, 10000000);
         assert_eq!(parsed.amount, 0);
-        assert_eq!(parsed.receiver, "ffcf8fdee72ac11b5c542428b35eef5769c409f0");
+        assert_eq!(parsed.receiver, "0xffcf8fdee72ac11b5c542428b35eef5769c409f0");
         assert_eq!(parsed.deadline, 0);
         assert_eq!(parsed.holder, "");
         assert_eq!(parsed.items_num, 1);

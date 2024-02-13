@@ -1,5 +1,11 @@
 use web3::types::{Recovery, H256};
-use crate::ethutils::bytes_to_address;
+use anychain_tron::TronAddress;
+use crate::errors::MemoParserError;
+
+pub enum L1AddressType {
+    Ethereum,
+    Tron,
+}
 
 pub fn ecrecover(data: Vec<u8>, signature: Vec<u8>, rpc: String) -> String {
     // TODO: support Tron recovery
@@ -27,8 +33,19 @@ pub fn ecrecover(data: Vec<u8>, signature: Vec<u8>, rpc: String) -> String {
     let addr_res = web3.accounts().recover(recovery);
 
     if addr_res.is_ok() {
-        return bytes_to_address(&addr_res.unwrap().0.to_vec(), crate::ethutils::L1AddressType::Ethereum).unwrap();
+        return bytes_to_address(&addr_res.unwrap().0.to_vec(), L1AddressType::Ethereum).unwrap();
     } else {
         return "unavailable".to_string();
+    }
+}
+
+pub fn bytes_to_address(bytes: &Vec<u8>, addr_type: L1AddressType) -> Result<String, MemoParserError> {
+    if bytes.len() != 20 {
+        return Err(MemoParserError::ParseError("Bad address length".to_string()));
+    }
+
+    match addr_type {
+        L1AddressType::Ethereum => Ok(format!("0x{}", hex::encode(bytes))),
+        L1AddressType::Tron => Ok(TronAddress::from_bytes(&bytes.as_slice()).to_string())
     }
 }

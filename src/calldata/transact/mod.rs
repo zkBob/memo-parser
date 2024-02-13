@@ -155,7 +155,7 @@ impl CalldataTransact {
 impl Display for CalldataTransact {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut result = String::new();
-        result += &format!("Calldata version : 0x{}\n", hex::encode(&self.nullifier));
+        result += &format!("Calldata version : {}\n", self.version);
         result += &format!("Nullifier        : 0x{}\n", hex::encode(&self.nullifier));
         result += &format!("Commitnment      : 0x{}\n", hex::encode(&self.out_commit));
         result += &format!("Index            : {} (0x{:x})\n", &self.tx_index, &self.tx_index);
@@ -170,13 +170,13 @@ impl Display for CalldataTransact {
         if self.root_after.len() > 0 {
             result += &format!("New Merkle Root  : {}\n", hex::encode(&self.root_after));
         }
-        result += &format!("Tx type           : {} ({})\n", &self.tx_type.to_string(), &self.tx_type.to_u32());
-        result += &format!("Memo size         : {} bytes\n", &self.memo_size);
+        result += &format!("Tx type          : {} ({})\n", &self.tx_type.to_string(), &self.tx_type.to_u32());
+        result += &format!("Memo size        : {} bytes\n", &self.memo_size);
         result += &format!("----------------------------------- MEMO BLOCK -----------------------------------\n");
         if self.version == 1 {
             result += &format!("Tx fee           : {} (0x{:x})\n", &self.memo.proxy_fee.separate_with_commas(), &self.memo.proxy_fee);
         } else if self.version >= 2 {
-            result += &format!("Proxy address    : {} ({})\n", &self.memo.proxy_address, hex::encode(&self.memo.proxy_address_raw));
+            result += &format!("Proxy address    : {}\n", &self.memo.proxy_address);
             result += &format!("Proxy fee        : {} (0x{:x})\n", &self.memo.proxy_fee.separate_with_commas(), &self.memo.proxy_fee);
             result += &format!("Prover fee       : {} (0x{:x})\n", &self.memo.prover_fee.unwrap().separate_with_commas(), &self.memo.prover_fee.unwrap());
         }
@@ -185,22 +185,26 @@ impl Display for CalldataTransact {
         match self.tx_type {
             TxType::Withdrawal => {
                 result += &format!("Native amount    : {} Gwei (0x{:x})\n", &self.memo.amount.separate_with_commas(), &self.memo.amount);
-                result += &format!("Withdraw addr    : 0x{} ({})\n", &self.memo.receiver, hex::encode(&self.memo.receiver_raw));
+                result += &format!("Withdraw addr    : {}\n", &self.memo.receiver);
             },
             TxType::DepositPermittable => {
                 let dt_utc = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp_opt(self.memo.deadline as i64, 0).unwrap(), Utc);
                 let dt_local: DateTime<Local> = DateTime::from(dt_utc);
                 result += &format!("Deadline         : {} (0x{:x})\n", dt_local.format("%Y-%m-%d %H:%M:%S"), &self.memo.deadline);
-                result += &format!("Deposit holder   : {} ({})\n", &self.memo.holder, hex::encode(&self.memo.holder_raw));
+                result += &format!("Deposit holder   : {}\n", &self.memo.holder);
             },
             _ => {},
         };
+
+        if self.version == 2 {
+            
+        }
 
         result += &format!("Account hash     : {}\n", hex::encode(&self.memo.acc_hash));
         for (note_idx, note_hash) in self.memo.notes_hashes.iter().enumerate() {
             result += &format!("Note #{} hash     : {}\n", note_idx, hex::encode(note_hash));
         }
-        result += &format!("A_p             : {}\n", hex::encode(&self.memo.a_p));
+        result += &format!("A_p              : {}\n", hex::encode(&self.memo.a_p));
         result += &print_long_hex("Encrypted keys   : ".to_string(), hex::encode(&self.memo.keys_enc), 64);
         result += &print_long_hex("Encrypted acc    : ".to_string(), hex::encode(&self.memo.acc_enc), 64);
 

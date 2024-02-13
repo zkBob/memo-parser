@@ -135,7 +135,7 @@ impl ParsedCalldata {
 impl Display for ParsedCalldata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut result = String::new();
-        result += &format!("Tx selector     : {} (0x{})\n", self.selector, self.selector.to_hex());
+        result += &format!("Tx selector      : {} (0x{})\n", self.selector, self.selector.to_hex());
         result += &format!("{}\n", self.content);
 
         write!(f, "{}", result)
