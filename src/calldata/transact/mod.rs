@@ -196,15 +196,20 @@ impl Display for CalldataTransact {
             _ => {},
         };
 
-        if self.version == 2 {
-            
+        if self.version == 2 && self.memo.message_size.is_some() {
+            result += &format!("Message length   : {}\n", &self.memo.message_size.unwrap());
         }
 
         result += &format!("Account hash     : {}\n", hex::encode(&self.memo.acc_hash));
         for (note_idx, note_hash) in self.memo.notes_hashes.iter().enumerate() {
             result += &format!("Note #{} hash     : {}\n", note_idx, hex::encode(note_hash));
         }
-        result += &format!("A_p              : {}\n", hex::encode(&self.memo.a_p));
+        if self.memo.a_p.len() > 0 {
+            result += &format!("A_p              : {}\n", hex::encode(&self.memo.a_p));
+        }
+        if self.memo.nonce.len() > 0 {
+            result += &format!("Nonce            : {}\n", hex::encode(&self.memo.nonce));
+        }
         result += &print_long_hex("Encrypted keys   : ".to_string(), hex::encode(&self.memo.keys_enc), 64);
         result += &print_long_hex("Encrypted acc    : ".to_string(), hex::encode(&self.memo.acc_enc), 64);
 
